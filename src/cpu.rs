@@ -1,60 +1,68 @@
-use std::vec::Vec;
+use rand::Rng;
+use std::fs;
+use std::path::Path;
 
-use sdl2::pixels::Color;
-use sdl2::rect::Rect;
-use sdl2::render::Canvas;
-use sdl2::video::Window;
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
+use crate::display::{Display, FONT_SET};
+use crate::keypad::Keypad;
 
-
+#[derive(Debug)]
 pub struct CPU {
-    pub opcode: u16,
-    // pub memory: [u8; 4096],
-    pub memory: Vec<u8>,
-    pub V: [u8; 16],
+    opcode: u16,
+    V: [u8; 16],
     // index reg
-    pub I: u16,
-    // program counter
-    pub pc: u16,
-    pub mem_addr_reg: u16,
-    // pub stack: [u16; 16],
-    pub stack: Vec<usize>,
-    pub sp: u16,
-
+    I: u16,
+    pc: u16,
+    stack: [u16; 16],
+    sp: u16,
+    pub memory: [u8; 4096],
+    
     pub delay_timer: u8,
     pub sound_timer: u8,
 
-    pub key: u8,
+    pub keypad: Keypad,
+    pub display: Display,
 }
 
+/// Main emulator struct it's called CPU but it is essentially the CPU + Display + Keypad
 impl CPU {
-    pub fn new() -> CPU {
+    pub fn new() -> Self {
         // might do something else here
-        CPU {
+        
+        Self {
             opcode: 0,
-            memory: vec![0; 4096],
+            memory: [0; 4096],
             V: [0; 16],
             I: 0,
             pc: 0x200,
-            mem_addr_reg: 0,
-            //stack: [0; 16],
-            stack: vec![],
+            stack: [0; 16],
             sp: 0,
             delay_timer: 0,
             sound_timer: 0,
-            key: 0,
+            keypad: Keypad::new(),
+            display: Display::new(),
         }
     }
-    // pub fn fetch_opcode(&mut self) -> () {
-    // self.opcode = self.memory[pc] << 8 | memory[pc+1];
-    //}
+    
+    /// Load rom into memory
+    pub fn load_rom(&mut self, path: &Path) {
+        let game = match fs::read(path) {
+            Err(e) => { 
+                //println!("Can't open rom {}", e); 
+                //std::process::exit(0);
+                panic!("Error couldn't open rom: {}", e)
+            }
+            Ok(f) => f,
+        };
+        self.memory[(0x200 as usize)..(0x200 as usize + game.len())].copy_from_slice(&game);
+    }
 
+    /// Fetch opcode 
     fn fetch_opcode(&mut self) -> u16 {
         (self.memory[self.pc as usize] as u16) << 8 | (self.memory[(self.pc + 1) as usize] as u16)
     }
 
-    fn exec_opcode(&mut self, opcode: u16) -> () {
+    /// Exec a single opcode
+    fn exec_opcode(&mut self, opcode: u16) {
         let x = ((opcode & 0x0F00) >> 8) as usize;
         let y = ((opcode & 0x00F0) >> 4) as usize;
         let vx = self.V[x];
@@ -63,26 +71,173 @@ impl CPU {
         let kk = (opcode & 0x00FF) as u8;
         let n = (opcode & 0x000F) as u8;
 
-        let op_1 = (opcode & 0xF000) >> 12;
-        let op_2 = (opcode & 0x0F00) >> 8;
-        let op_3 = (opcode & 0x00F0) >> 4;
-        let op_4 = opcode & 0x000F;
+        // split into nibbles
+        // and check which element
+        // e.g opcode = 0x1A42, op_1 = 0x1, op_2 = 0xA etc.
+        let nibble_1 = (opcode & 0xF000) >> 12;
+        let nibble_2 = (opcode & 0x0F00) >> 8;
+        let nibble_3 = (opcode & 0x00F0) >> 4;
+        let nibble_4 = opcode & 0x000F;
 
-        match (op_1, op_2, op_3, op_4) {
+        match (nibble_1, nibble_2, nibble_3, nibble_4) {
+            (0x0, 0x0, 0xE, 0x0) => {
+                // CLS
+                self.display.cls();
+            }
+            (0x0, 0x0, 0xE, 0xE) => {
+                // RET
+                self.pc = self.stack[self.sp as usize];
+                self.sp = self.sp - 1;
+            }
             (0x1, _, _, _) => {
+                // JP
                 self.pc = nnn;
             }
             (0x2, _, _, _) => {
-                self.stack.push(self.pc as usize);
+                // CALL
                 self.sp = self.sp + 1;
+                // self.stack.push(self.pc as usize);
+                self.stack[self.sp as usize] = self.pc;
+                self.pc = nnn;
             }
-
-            _ => ()
+            (0x3, _, _, _) => {
+                // SE Vx == kk
+                if vx == kk {
+                    self.pc += 2;
+                }
+            }
+            (0x4, _, _, _) => {
+                // SNE Vx != kk
+                if vx != kk {
+                    self.pc += 2;
+                }
+            }
+            (0x5, _, _, _) => {
+                // SE Vx == Vy
+                if vx == vy {
+                    self.pc += 2;
+                }
+            }
+            (0x6, _, _, _) => {
+                // LD Vx
+                self.V[x] = kk;
+            }
+            (0x7, _, _, _) => {
+                // ADD Vx, byte
+                self.V[x] += kk;
+            }
+            (0x8, _, _, 0x0) => {
+                // LD Vx, Vy
+                self.V[x] = self.V[y];
+            }
+            (0x8, _, _, 0x1) => {
+                // OR Vx, Vy
+                self.V[x] = self.V[x] | self.V[y];
+            }
+            (0x8, _, _, 0x2) => {
+                // AND Vx, Vy
+                self.V[x] = self.V[x] & self.V[y];
+            }
+            (0x8, _, _, 0x3) => {
+                // XOR Vx, Vy
+                self.V[x] = self.V[x] ^ self.V[y];
+            }
+            (0x8, _, _, 0x4) => {
+                // ADD Vx, Vy
+                let (result, overflow) = self.V[x].overflowing_add(self.V[y]);
+                self.V[0xF] = if overflow { 1 } else { 0 };
+                self.V[x] = result; 
+            }
+            (0x8, _, _, 0x5) => {
+                // SUB Vx, Vy
+                let (result, overflow) = self.V[x].overflowing_sub(self.V[y]);
+                self.V[0xF] = if overflow { 0 } else { 1 };
+                self.V[x] = result;
+            }
+            (0x8, _, _, 0x6) => {
+                // SHR Vx, {, Vy}
+                self.V[0xF] = self.V[x] & 0x1; 
+                self.V[x] >>= 1;
+            }
+            (0x8, _, _, 0x7) => {
+                // SUBN Vx, Vy
+                let (result, overflow) = self.V[y].overflowing_sub(self.V[x]);
+                self.V[0xF] = if overflow { 0 } else { 1 };
+                self.V[x] = result;
+            }
+            (0x8, _, _, 0xE) => {
+                self.V[0xF] = self.V[x] & 0x80;
+                self.V[x] <<= 1;
+            }
+            (0x9, _, _, _) => {
+               if self.V[x] != self.V[y] {
+                    self.pc += 2;
+               }
+            }
+            (0xA, _, _, _) => {
+                self.I = nnn;
+            }
+            (0xB, _, _, _) => {
+                self.pc = nnn + self.V[0] as u16;
+            }
+            (0xC, _, _, _) => {
+                // #NOTE Might be slower if i create thread_rng here, could change later
+                let rng = rand::thread_rng().gen::<u8>();
+                self.V[x] = rng & kk;
+            }
+            (0xD, _, _, _) => {
+               let collision = self.display.draw_sprite(vx as usize, vy as usize,
+                                                    &self.memory[self.I as usize .. (self.I + n as u16) as usize]); 
+               self.V[0xF] = if collision { 1 } else { 0 }; 
+            }
+            (0xE, _, 0x9, 0xE) => {
+                self.pc += if self.keypad.is_key_down(vx) { 2 } else { 0 };  
+            }
+            (0xE, _, 0xA, 0x1) => {
+                self.pc += if !self.keypad.is_key_down(vx) { 2 } else { 0 }; 
+            }
+            (0xF, _, 0x0, 0x7) => {
+                self.V[x] = self.delay_timer;
+            }
+            (0xF, _, 0x0, 0xA) => {
+                // #NOTE possible error with the pc decrement
+                if let Some(key) = self.keypad.get_pressed_key() {
+                    self.V[x] = key;
+                }
+                else {
+                    self.pc -= 2;
+                }
+            }
+            (0xF, _, 0x1, 0x5) => {
+                self.delay_timer = self.V[x];
+            }
+            (0xF, _, 0x1, 0x8) => {
+                self.sound_timer = self.V[x];
+            }
+            (0xF, _, 0x1, 0xE) => {
+                self.I += self.V[x] as u16;
+            }
+            (0xF, _, 0x2, 0x9) => {
+                self.I = self.V[x] as u16 * 5;
+            }
+            (0xF, _, 0x3, 0x3) => {
+                self.memory[self.I as usize] = self.V[x] / 100;
+                self.memory[self.I as usize + 1] = (self.V[x] / 10) % 10;
+                self.memory[self.I as usize + 2] = (self.V[x] % 100) % 10;
+            }
+            (0xF, _, 0x5, 0x5) => {
+                self.memory[(self.I as usize)..(self.I + x as u16 + 1) as usize].copy_from_slice(&self.V[0..(x as usize + 1)]);
+            }
+            (0xF, _, 0x6, 0x5) => {
+               self.V[0..(x as usize + 1)].copy_from_slice(&self.memory[(self.I as usize)..(self.I + x as u16 + 1) as usize]); 
+            }
+            (_, _, _, _) => (),
         }
     }
 
-    pub fn run_cycle(&mut self) -> () {
+    pub fn run_cycle(&mut self) {
         let opcode: u16 = self.fetch_opcode();
+        self.pc += 2; // increment pc after each fetching op 
         self.exec_opcode(opcode);
     }
 }
