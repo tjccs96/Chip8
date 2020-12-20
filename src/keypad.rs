@@ -12,6 +12,10 @@ impl Keypad {
 
     }
 
+    pub fn set(&mut self, index: u8, down: bool) {
+        self.keys[index as usize] = down;
+    }
+
     pub fn is_key_down(&self, index: u8) -> bool {
         self.keys[index as usize]
     }

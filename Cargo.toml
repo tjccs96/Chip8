@@ -15,6 +15,4 @@ debug = false
 
 [dependencies]
 rand = "0.7.3"
-winit = "0.23.0"
-wgpu = "0.6.2"
-futures = "0.3.8"
+sdl2 = "0.34.3"

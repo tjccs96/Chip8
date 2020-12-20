@@ -4,33 +4,62 @@ const DISPLAY_HEIGHT: usize = 32;
 #[derive(Debug)]
 pub struct Display {
     frame_buffer: [[u8; DISPLAY_WIDTH]; DISPLAY_HEIGHT],
+    //frame_buffer: [u8; DISPLAY_WIDTH * DISPLAY_HEIGHT],
     dirty: bool,
 }
 
 impl Display {
-    pub fn new() -> Display {
-        Display {
+    pub fn new() -> Self {
+        Self {
             frame_buffer: [[0; DISPLAY_WIDTH]; DISPLAY_HEIGHT],
+            //frame_buffer: [0; DISPLAY_WIDTH * DISPLAY_HEIGHT],
             dirty: true,
         }
     }
 
     pub fn cls(&mut self) {
         self.frame_buffer = [[0; DISPLAY_WIDTH]; DISPLAY_HEIGHT];
+        //self.frame_buffer = [0; DISPLAY_WIDTH * DISPLAY_HEIGHT];
         self.dirty = true;
     }
+
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    pub fn reset_dirty(&mut self) {
+        self.dirty = false;
+    }
+
+    //pub fn set_pixel(&mut self, x: usize, y: usize, on: bool) {
+    //    self.frame_buffer[x + y * DISPLAY_WIDTH] = on as u8;
+    //}
+
+    //pub fn get_pixel(&mut self, x: usize, y: usize) -> bool {
+    //    self.frame_buffer[x + y * DISPLAY_WIDTH] == 1
+    //}
 
     pub fn draw_sprite(&mut self, x: usize, y: usize, sprite: &[u8]) -> bool {
         let rows = sprite.len();
         let mut collision = false;
 
         for j in 0..rows {
-            // let _row = sprite[j];
+            //let row = sprite[j];
             for i in 0..8 {
                 let new_y = (y + j) % DISPLAY_HEIGHT;
                 let new_x = (x + i) % DISPLAY_WIDTH;
+                //let new_value = row >> (7 - i) & 0x01;
                 
-                // check if pixel is on
+                //if new_value == 1 {
+                //    let xi = (x + i) % DISPLAY_WIDTH;
+                //    let yj = (y + j) % DISPLAY_HEIGHT;
+                //    let old_value = self.get_pixel(xi, yj);
+                //    if old_value {
+                //        collision = true;
+                //    }
+                //    self.set_pixel(xi, yj, (new_value == 1) ^ old_value);
+                //}
+                //check if pixel is on
                 if (sprite[j] & (0x80 >> i)) != 0x00 {
                     if self.frame_buffer[new_y][new_x] == 0x01 {
                         collision = true;
@@ -42,6 +71,10 @@ impl Display {
         self.dirty = true;
 
         collision
+    }
+
+    pub fn get_frame_buffer(&self) -> &[[u8; 64]; 32] {
+        &self.frame_buffer
     }
 }
 

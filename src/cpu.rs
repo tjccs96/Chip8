@@ -1,9 +1,10 @@
 use rand::Rng;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 
 use crate::display::{Display, FONT_SET};
 use crate::keypad::Keypad;
+
 
 #[derive(Debug)]
 pub struct CPU {
@@ -27,10 +28,14 @@ pub struct CPU {
 impl CPU {
     pub fn new() -> Self {
         // might do something else here
-        
+        let mut memory = [0u8; 4096];
+        for i in 0..FONT_SET.len() {
+            memory[i] = FONT_SET[i];
+        }
+
         Self {
             opcode: 0,
-            memory: [0; 4096],
+            memory: memory,
             V: [0; 16],
             I: 0,
             pc: 0x200,
@@ -44,10 +49,12 @@ impl CPU {
     }
     
     /// Load rom into memory
-    pub fn load_rom(&mut self, path: &Path) {
-        let game = match fs::read(path) {
+    pub fn load_rom(&mut self, rom_path: &PathBuf) {
+        // This is here just to reset the CPU when a Rom is loaded.
+        *self = Self::new();
+        let game = match fs::read(rom_path) {
             Err(e) => { 
-                //println!("Can't open rom {}", e); 
+                println!("Can't open rom {}", e); 
                 //std::process::exit(0);
                 panic!("Error couldn't open rom: {}", e)
             }
@@ -78,6 +85,10 @@ impl CPU {
         let nibble_2 = (opcode & 0x0F00) >> 8;
         let nibble_3 = (opcode & 0x00F0) >> 4;
         let nibble_4 = opcode & 0x000F;
+
+        self.pc += 2;
+       
+        println!("op: {:?}", opcode);
 
         match (nibble_1, nibble_2, nibble_3, nibble_4) {
             (0x0, 0x0, 0xE, 0x0) => {
@@ -236,8 +247,8 @@ impl CPU {
     }
 
     pub fn run_cycle(&mut self) {
-        let opcode: u16 = self.fetch_opcode();
-        self.pc += 2; // increment pc after each fetching op 
+        let opcode: u16 = self.fetch_opcode(); 
+        //self.pc += 2; // increment pc after each fetching op 
         self.exec_opcode(opcode);
     }
 }
