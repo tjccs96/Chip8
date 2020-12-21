@@ -16,20 +16,6 @@ use crate::cpu::CPU;
 const SCALE: u32 = 20;
 
 
-struct CustomKeycodes {
-    event: sdl2::EventPump,
-}
-
-impl CustomKeycodes {
-    pub fn new(sdl_context: &Sdl) -> Self {
-        CustomKeycodes {
-            event: sdl_context.event_pump().unwrap(),
-        }
-    }
-
-}
-
-
 struct CustomCanvas {
     pub canvas: Canvas<Window>
 }
@@ -38,7 +24,7 @@ impl CustomCanvas {
     pub fn new(sdl_context: &Sdl) -> Self { 
         let video_subsystem = sdl_context.video().unwrap();
      
-        let window = video_subsystem.window("rust-sdl2 demo", 64 * SCALE, 32 * SCALE)
+        let window = video_subsystem.window("CHIP-8 Emulator", 64 * SCALE, 32 * SCALE)
             .position_centered()
             .build()
             .unwrap();
@@ -58,7 +44,7 @@ impl CustomCanvas {
         if value == 0 {
             pixels::Color::RGB(0, 0, 0)
         } else {
-            pixels::Color::RGB(0, 250, 200)
+            pixels::Color::RGB(0, 150, 200)
         }
     }
 
@@ -68,8 +54,6 @@ impl CustomCanvas {
             for (x, &col) in row.iter().enumerate() {
                 let x = (x as u32) * SCALE;
                 let y = (y as u32) * SCALE;
-                //let x = (i % 64) as u32 * scale;
-                //let y = (i / 64) as u32 * scale;
             
                 self.canvas.set_draw_color(self.color(col));
                 let _ = self.canvas.fill_rect(Rect::new(x as i32, y as i32, SCALE, SCALE));
@@ -89,43 +73,33 @@ pub struct Emulator {
 impl Emulator {
     pub fn new(path: &PathBuf) -> Self {
         
-        //let mut memory: [u8; 4096] = [0; 4096];
-        // memory = [0x200..0x200 + rom.len()].copy_from_slice(&rom[..]);
         let mut cpu = CPU::new();
         cpu.load_rom(&path);
-        //println!("Cpu: {:?}", cpu);
         Self {
             cpu: cpu,
         }
     }
 
-    //fn set_key_state(&mut self, code: VirtualKeyCode, state: bool) {
-    //}
-    
     pub fn set_keycode(&mut self, code: Keycode, state: bool) {
-            let index = match code {
-                Keycode::Num1 => Some(0x1),
-                Keycode::Num2 => Some(0x2),
-                Keycode::Num3 => Some(0x3),
-                Keycode::Num4 => Some(0xc),
-                Keycode::Q => Some(0x4),
-                Keycode::W => Some(0x5),
-                Keycode::E => Some(0x6),
-                Keycode::R => Some(0xd),
-                Keycode::A => Some(0x7),
-                Keycode::S => Some(0x8),
-                Keycode::D => Some(0x9),
-                Keycode::F => Some(0xe),
-                Keycode::Z => Some(0xa),
-                Keycode::X => Some(0x0),
-                Keycode::C => Some(0xb),
-                Keycode::V => Some(0xf),
-                _ => None,
-            };
-            if let Some(i) = index {
-                self.cpu.keypad.set(i, state);
-                println!("{:?}", self.cpu.keypad);
-            }
+        match code {
+            Keycode::Num1 => { self.cpu.keypad.set(0x1, state); },
+            Keycode::Num2 => { self.cpu.keypad.set(0x2, state); },
+            Keycode::Num3 => { self.cpu.keypad.set(0x3, state); },
+            Keycode::Num4 => { self.cpu.keypad.set(0xC, state); },
+            Keycode::Q => { self.cpu.keypad.set(0x4, state); },
+            Keycode::W => { self.cpu.keypad.set(0x5, state); },
+            Keycode::E => { self.cpu.keypad.set(0x6, state); },
+            Keycode::R => { self.cpu.keypad.set(0xD, state); },
+            Keycode::A => { self.cpu.keypad.set(0x7, state); },
+            Keycode::S => { self.cpu.keypad.set(0x8, state); },
+            Keycode::D => { self.cpu.keypad.set(0x9, state); },
+            Keycode::F => { self.cpu.keypad.set(0xE, state); },
+            Keycode::Z => { self.cpu.keypad.set(0xA, state); },
+            Keycode::X => { self.cpu.keypad.set(0x0, state); },
+            Keycode::C => { self.cpu.keypad.set(0xB, state); },
+            Keycode::V => { self.cpu.keypad.set(0xF, state); },
+            _ => {}
+        }           
 
     }
 
@@ -148,8 +122,10 @@ impl Emulator {
                 }
             }
             // The rest of the game loop goes here...
-            ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 600));
+            //::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 600));
+            ::std::thread::sleep(Duration::from_millis(2)); 
             self_mut.cpu.run_cycle();
+            self_mut.cpu.decrement_dt();
             canvas.draw_canvas(self_mut);
         }
     }

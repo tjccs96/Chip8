@@ -6,8 +6,7 @@ use chip8::emulator::Emulator;
 
 fn main() {
     
-    let path = PathBuf::from("Roms/test_opcode.ch8");
+    let path = PathBuf::from("Roms/TANK");
     let emulator = Rc::new(Emulator::new(&path));
     emulator.run();
-    println!("Emulator ran");
 }

@@ -1,3 +1,4 @@
+use std::{thread, time};
 use rand::Rng;
 use std::fs;
 use std::path::PathBuf;
@@ -63,6 +64,12 @@ impl CPU {
         self.memory[(0x200 as usize)..(0x200 as usize + game.len())].copy_from_slice(&game);
     }
 
+    pub fn decrement_dt(&mut self) {
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
+    }
+
     /// Fetch opcode 
     fn fetch_opcode(&mut self) -> u16 {
         (self.memory[self.pc as usize] as u16) << 8 | (self.memory[(self.pc + 1) as usize] as u16)
@@ -88,7 +95,6 @@ impl CPU {
 
         self.pc += 2;
        
-        println!("op: {:?}", opcode);
 
         match (nibble_1, nibble_2, nibble_3, nibble_4) {
             (0x0, 0x0, 0xE, 0x0) => {
@@ -97,8 +103,8 @@ impl CPU {
             }
             (0x0, 0x0, 0xE, 0xE) => {
                 // RET
-                self.pc = self.stack[self.sp as usize];
                 self.sp = self.sp - 1;
+                self.pc = self.stack[self.sp as usize];
             }
             (0x1, _, _, _) => {
                 // JP
@@ -106,9 +112,10 @@ impl CPU {
             }
             (0x2, _, _, _) => {
                 // CALL
-                self.sp = self.sp + 1;
                 // self.stack.push(self.pc as usize);
+                
                 self.stack[self.sp as usize] = self.pc;
+                self.sp = self.sp + 1; 
                 self.pc = nnn;
             }
             (0x3, _, _, _) => {
@@ -135,7 +142,9 @@ impl CPU {
             }
             (0x7, _, _, _) => {
                 // ADD Vx, byte
-                self.V[x] += kk;
+                // self.V[x] += kk; was overflowing.
+                let result = self.V[x].wrapping_add(kk);
+                self.V[x] = result;
             }
             (0x8, _, _, 0x0) => {
                 // LD Vx, Vy
@@ -177,13 +186,14 @@ impl CPU {
                 self.V[x] = result;
             }
             (0x8, _, _, 0xE) => {
-                self.V[0xF] = self.V[x] & 0x80;
+                //self.V[0xF] = self.V[x] & 0x80;
+                self.V[0xF] = self.V[x] >> 7;
                 self.V[x] <<= 1;
             }
             (0x9, _, _, _) => {
-               if self.V[x] != self.V[y] {
+                if self.V[x] != self.V[y] {
                     self.pc += 2;
-               }
+                } 
             }
             (0xA, _, _, _) => {
                 self.I = nnn;
@@ -211,7 +221,6 @@ impl CPU {
                 self.V[x] = self.delay_timer;
             }
             (0xF, _, 0x0, 0xA) => {
-                // #NOTE possible error with the pc decrement
                 if let Some(key) = self.keypad.get_pressed_key() {
                     self.V[x] = key;
                 }
@@ -248,7 +257,6 @@ impl CPU {
 
     pub fn run_cycle(&mut self) {
         let opcode: u16 = self.fetch_opcode(); 
-        //self.pc += 2; // increment pc after each fetching op 
         self.exec_opcode(opcode);
     }
 }
