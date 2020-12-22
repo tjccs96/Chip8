@@ -11,7 +11,6 @@ use crate::keypad::Keypad;
 pub struct CPU {
     opcode: u16,
     V: [u8; 16],
-    // index reg
     I: u16,
     pc: u16,
     stack: [u16; 16],
@@ -28,15 +27,16 @@ pub struct CPU {
 /// Main emulator struct it's called CPU but it is essentially the CPU + Display + Keypad
 impl CPU {
     pub fn new() -> Self {
-        // might do something else here
-        let mut memory = [0u8; 4096];
-        for i in 0..FONT_SET.len() {
-            memory[i] = FONT_SET[i];
-        }
-
+        let mut initial_memory = [0u8; 4096];
+        initial_memory[0..FONT_SET.len()].copy_from_slice(&FONT_SET);
+        
+        //for i in 0..FONT_SET.len() {
+        //    initial_memory[i] = FONT_SET[i];
+        //} 
+        
         Self {
             opcode: 0,
-            memory: memory,
+            memory: initial_memory,
             V: [0; 16],
             I: 0,
             pc: 0x200,
@@ -48,15 +48,13 @@ impl CPU {
             display: Display::new(),
         }
     }
-    
+   
+
     /// Load rom into memory
     pub fn load_rom(&mut self, rom_path: &PathBuf) {
-        // This is here just to reset the CPU when a Rom is loaded.
-        *self = Self::new();
         let game = match fs::read(rom_path) {
             Err(e) => { 
                 println!("Can't open rom {}", e); 
-                //std::process::exit(0);
                 panic!("Error couldn't open rom: {}", e)
             }
             Ok(f) => f,
@@ -67,6 +65,9 @@ impl CPU {
     pub fn decrement_dt(&mut self) {
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
+        }
+        if self.sound_timer > 0 {
+            self.sound_timer -= 1;
         }
     }
 
@@ -103,7 +104,7 @@ impl CPU {
             }
             (0x0, 0x0, 0xE, 0xE) => {
                 // RET
-                self.sp = self.sp - 1;
+                self.sp -= 1;
                 self.pc = self.stack[self.sp as usize];
             }
             (0x1, _, _, _) => {
@@ -112,10 +113,8 @@ impl CPU {
             }
             (0x2, _, _, _) => {
                 // CALL
-                // self.stack.push(self.pc as usize);
-                
                 self.stack[self.sp as usize] = self.pc;
-                self.sp = self.sp + 1; 
+                self.sp += 1; 
                 self.pc = nnn;
             }
             (0x3, _, _, _) => {
@@ -143,8 +142,9 @@ impl CPU {
             (0x7, _, _, _) => {
                 // ADD Vx, byte
                 // self.V[x] += kk; was overflowing.
-                let result = self.V[x].wrapping_add(kk);
-                self.V[x] = result;
+                // Since we dont care about the overflow flag,
+                // do wrapping_add.
+                self.V[x] = self.V[x].wrapping_add(kk);
             }
             (0x8, _, _, 0x0) => {
                 // LD Vx, Vy
@@ -208,7 +208,7 @@ impl CPU {
             }
             (0xD, _, _, _) => {
                let collision = self.display.draw_sprite(vx as usize, vy as usize,
-                                                    &self.memory[self.I as usize .. (self.I + n as u16) as usize]); 
+                                                        &self.memory[self.I as usize .. (self.I + n as u16) as usize]); 
                self.V[0xF] = if collision { 1 } else { 0 }; 
             }
             (0xE, _, 0x9, 0xE) => {

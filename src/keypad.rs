@@ -5,8 +5,8 @@ pub struct Keypad {
 }
 
 impl Keypad {
-    pub fn new() -> Keypad {
-        Keypad {
+    pub fn new() -> Self {
+        Self {
             keys: [false; 16]
         }
 

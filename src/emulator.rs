@@ -1,23 +1,24 @@
 use std::path::PathBuf;
 use std::rc::Rc;
-
-use sdl2::event::Event;
-use sdl2::pixels;
-use sdl2::rect::Rect;
-use sdl2::video::Window;
-use sdl2::render::Canvas;
-use sdl2::pixels::Color;
-use sdl2::keyboard::Keycode;
-use sdl2::Sdl;
 use std::time::Duration;
 
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
+use sdl2::pixels;
+use sdl2::pixels::Color;
+use sdl2::rect::Rect;
+use sdl2::render::Canvas;
+use sdl2::Sdl;
+use sdl2::video::Window;
+
 use crate::cpu::CPU;
+
 
 const SCALE: u32 = 20;
 
 
 struct CustomCanvas {
-    pub canvas: Canvas<Window>
+    pub custom_canvas: Canvas<Window>
 }
 
 impl CustomCanvas {
@@ -35,16 +36,17 @@ impl CustomCanvas {
         canvas.clear();
         canvas.present();
         
-        CustomCanvas {
-            canvas: canvas,
+        Self {
+            custom_canvas: canvas,
         }
     }
-    
-    pub fn color(&self, value: u8) -> pixels::Color {
-        if value == 0 {
+   
+    /// Set color for pixels.
+    fn color(&self, pixel_value: u8) -> pixels::Color {
+        if pixel_value == 0 {
             pixels::Color::RGB(0, 0, 0)
         } else {
-            pixels::Color::RGB(0, 150, 200)
+            pixels::Color::RGB(55, 52, 69)
         }
     }
 
@@ -55,12 +57,13 @@ impl CustomCanvas {
                 let x = (x as u32) * SCALE;
                 let y = (y as u32) * SCALE;
             
-                self.canvas.set_draw_color(self.color(col));
-                let _ = self.canvas.fill_rect(Rect::new(x as i32, y as i32, SCALE, SCALE));
-                
+                self.custom_canvas.set_draw_color(self.color(col));
+                // unwrap here since it's a panic if this throws an error which will cause the 
+                // screen to not display anything.
+                self.custom_canvas.fill_rect(Rect::new(x as i32, y as i32, SCALE, SCALE)).unwrap();
             }
         }
-        self.canvas.present();
+        self.custom_canvas.present();
     }
 }
 
@@ -79,8 +82,8 @@ impl Emulator {
             cpu: cpu,
         }
     }
-
-    pub fn set_keycode(&mut self, code: Keycode, state: bool) {
+    
+    fn set_keycode(&mut self, code: Keycode, state: bool) {
         match code {
             Keycode::Num1 => { self.cpu.keypad.set(0x1, state); },
             Keycode::Num2 => { self.cpu.keypad.set(0x2, state); },
@@ -109,12 +112,12 @@ impl Emulator {
         let sdl_context = sdl2::init().unwrap();
         let mut event_pump = sdl_context.event_pump().unwrap();
         let mut canvas = CustomCanvas::new(&sdl_context);        
-        'running: loop {
+        'game_loop: loop {
             for event in event_pump.poll_iter() {
                 match event {
                     Event::Quit {..} |
                     Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                        break 'running
+                        break 'game_loop
                     },
                     Event::KeyDown { keycode: Some(keycode), .. } => self_mut.set_keycode(keycode, true),
                     Event::KeyUp { keycode: Some(keycode), .. } => self_mut.set_keycode(keycode, false),
@@ -122,8 +125,7 @@ impl Emulator {
                 }
             }
             // The rest of the game loop goes here...
-            //::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 600));
-            ::std::thread::sleep(Duration::from_millis(2)); 
+            ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 600));
             self_mut.cpu.run_cycle();
             self_mut.cpu.decrement_dt();
             canvas.draw_canvas(self_mut);

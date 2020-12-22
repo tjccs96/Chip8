@@ -5,8 +5,9 @@ use chip8::emulator::Emulator;
 
 
 fn main() {
-    
-    let path = PathBuf::from("Roms/TANK");
+    // TODO need to let the user pick a ROM from a dir
+    // instead hard coding it
+    let path = PathBuf::from("Roms/TICTAC");
     let emulator = Rc::new(Emulator::new(&path));
     emulator.run();
 }
