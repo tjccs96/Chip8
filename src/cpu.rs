@@ -30,10 +30,6 @@ impl CPU {
         let mut initial_memory = [0u8; 4096];
         initial_memory[0..FONT_SET.len()].copy_from_slice(&FONT_SET);
         
-        //for i in 0..FONT_SET.len() {
-        //    initial_memory[i] = FONT_SET[i];
-        //} 
-        
         Self {
             opcode: 0,
             memory: initial_memory,
@@ -51,15 +47,11 @@ impl CPU {
    
 
     /// Load rom into memory
-    pub fn load_rom(&mut self, rom_path: &PathBuf) {
-        let game = match fs::read(rom_path) {
-            Err(e) => { 
-                println!("Can't open rom {}", e); 
-                panic!("Error couldn't open rom: {}", e)
-            }
-            Ok(f) => f,
-        };
-        self.memory[(0x200 as usize)..(0x200 as usize + game.len())].copy_from_slice(&game);
+    pub fn load_rom(&mut self, rom_path: &PathBuf) -> Result<(), std::io::Error>{
+        let game = fs::read(rom_path)?;
+        self.memory[(0x200 as usize)..(0x200 as usize + game.len())].copy_from_slice(&game); 
+        
+        Ok(())
     }
 
     pub fn decrement_dt(&mut self) {
