@@ -1,4 +1,3 @@
-use std::{thread, time};
 use rand::Rng;
 use std::fs;
 use std::path::PathBuf;

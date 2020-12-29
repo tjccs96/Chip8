@@ -74,13 +74,11 @@ pub struct Emulator {
 }
 
 impl Emulator {
-    pub fn new(path: &PathBuf) -> Self {
+    pub fn new(path: &PathBuf) -> Result<Self, std::io::Error> {
         
         let mut cpu = CPU::new();
-        cpu.load_rom(&path);
-        Self {
-            cpu: cpu,
-        }
+        cpu.load_rom(&path)?; 
+        Ok(Self { cpu: cpu, }) 
     }
     
     fn set_keycode(&mut self, code: Keycode, state: bool) {
