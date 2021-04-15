@@ -76,7 +76,7 @@ impl CPU {
         let nnn = opcode & 0x0FFF;
         let kk = (opcode & 0x00FF) as u8;
         let n = (opcode & 0x000F) as u8;
-
+        
         // split into nibbles
         // and check which element
         // e.g opcode = 0x1A42, op_1 = 0x1, op_2 = 0xA etc.
